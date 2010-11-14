@@ -1121,6 +1121,8 @@ public class MMMsurvival extends Plugin
                 	boolean done = false;
                 	int mx=0,my=0,mz=0,rata=0;
                 	
+                	//
+                	
                 	if (!done) {
                 	mx = LtB(npc.getX())+1; my = (int)y; mz = LtB(npc.getZ()); rata = 270;
                 	if ((rata != ((lastrot)+180)%360) && transparentBlocks.contains(etc.getServer().getBlockAt(mx,my,mz).getType()))
