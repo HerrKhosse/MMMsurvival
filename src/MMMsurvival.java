@@ -5,6 +5,7 @@
 
 import java.io.*;
 import java.util.*;
+import java.util.logging.Logger;
 
 import javax.xml.bind.*;
 import org.apache.commons.net.ftp.FTPClient;
@@ -32,8 +33,10 @@ public class MMMsurvival extends Plugin
     private HashMap<Integer,String> mobs 						= new HashMap<Integer,String>();
     
     private ArrayList<NPC> npcs									= new ArrayList<NPC>();
+    private HashSet<House> houses 								= new HashSet<House>();
     
     private Location house = new Location();
+    private Location tmpTo = new Location();
     
     Server server = etc.getServer();
     String Server = "\247c[Server]\247f ";
@@ -46,7 +49,8 @@ public class MMMsurvival extends Plugin
     boolean test = false;
 	
     NPC testnpc;
-    ThreadNPCMovement moveth;
+    ThreadNPCPath moveth;
+    ThreadBuildHouse buildhouse;
     
     public class MMMsurvivalListener extends PluginListener
     {
@@ -170,7 +174,32 @@ public class MMMsurvival extends Plugin
                     }
                 }
                 break;
-
+            
+            case 337:
+        		blox = new HitBlox(player, 300, 0.3);
+                block = blox.getTargetBlock();
+                player.sendMessage(""+block.getData());
+            	break;
+                
+            case 339: 
+        		blox = new HitBlox(player, 300, 0.3);
+                block = blox.getTargetBlock();
+        	 	Block tblock = server.getBlockAt(block.getX(), block.getY(), block.getZ());
+            	if (tblock.getType() == 64)
+            	{
+            		
+            		for (String str:getAdjacentDoorBlocks(tblock.getX(),tblock.getY(),tblock.getZ()))
+            		{
+            			String splitar[] = str.split(":");
+            			int x = Integer.valueOf(splitar[0]);
+            			int y = Integer.valueOf(splitar[1]);
+            			int z = Integer.valueOf(splitar[2]);
+            			
+            			tblock = server.getBlockAt(x, y, z);
+            		}
+            	}
+            	break;
+            	
             case 340: 
                 Location playerLoc = new Location();
                 Location tempLoc = player.getLocation();
@@ -221,7 +250,7 @@ public class MMMsurvival extends Plugin
                 for (int i = 0; i < playerlist.size(); i++)
                 {
                     if ( player == player(i) || !stats(player).pvp || !stats(player(i)).pvp || !isNear(player.getLocation(), player(i).getLocation(), meleeRange) ) {continue;}
-                    playerDamage(player(i), getPVPWeaponDamage(player.getItemInHand()));
+                    playerDamage(player(i), getWeaponPVPDamage(player.getItemInHand()));
                     break;
                 }
 
@@ -278,6 +307,7 @@ public class MMMsurvival extends Plugin
         {
             int bt 	= server.getBlockAt( LtB(player.getX()), (int)Math.round(player.getY()), LtB(player.getZ())).getType();
             int dbt = server.getBlockAt( LtB(player.getX()), (int)Math.round(player.getY()) - 1, LtB(player.getZ())).getType();
+            
             //Unable to swim
             int tmptype = server.getBlockAt(LtB(to.x), LtB(to.y), LtB(to.z)).getType();
             if (tmptype == 9 && !server.isTimerExpired("Spawnprotection-" + player.getName())) {stats(player).underwater = true;}else{stats(player).underwater = false; stats(player).breath = 0;}
@@ -337,9 +367,10 @@ public class MMMsurvival extends Plugin
                 }
                 else
                 {
-                    if(stats(player).fallingDamage - 2 > 0 && dbt != 8 && dbt != 9)
+                	player.sendMessage(""+stats(player).fallingDamage);
+                    if(stats(player).fallingDamage - 3 > 0 && dbt != 8 && dbt != 9)
                     {
-                        playerDamage(player, stats(player).fallingDamage - 2);
+                        playerDamage(player, (int)Math.round(stats(player).fallingDamage) - 3);
                     }
                     stats(player).fallingDamage = 0;
                 }
@@ -412,6 +443,32 @@ public class MMMsurvival extends Plugin
         		player.sendMessage((new StringBuilder("\247eReputation: \247f")).append(stats(player).reputationName).toString());
         		player.sendMessage((new StringBuilder("\247eKills: \247f")).append(stats(player).monsterkills.toString()).toString());
         		player.sendMessage((new StringBuilder("\247eDeployed: \247f")).append(stats(player).deployedblocks.toString()).toString());
+        		return true;
+        	}
+        	
+        	//GetHouse repots
+        	if(split[0].equalsIgnoreCase("/houses"))
+        	{
+        		for(House house:houses)
+        		{
+        		  player.sendMessage(house.owner+" "+house.blockCount);
+        		}
+        		return true;
+        	}
+        	
+        	if(split[0].equalsIgnoreCase("/get"))
+        	{
+        		int i = 0;
+	        	for(House house:houses)
+	        	{
+	        		if (split.length > 1)
+	        		{
+		        		 if (i == Integer.valueOf(split[1])) {house.getReport(player);}
+		        		 i++;
+	        		}else{
+	        			player.sendMessage(""+house.hashCode());
+	        		}
+	        	}
         		return true;
         	}
         	
@@ -547,7 +604,45 @@ public class MMMsurvival extends Plugin
         	{
         		if (moveth != null) {moveth.running = false; testnpc.delete(); testnpc.untrack(player); freeze(500);}
         		testnpc = new NPC("",playerCenter(player.getX()),player.getY(),playerCenter(player.getZ()),(float)player.getRotation(),(float)player.getPitch(),1);
-        		moveth = new ThreadNPCMovement(testnpc);
+        		//moveth = new ThreadNPCMovement(testnpc);
+        		return true;
+        	}
+        	
+        	if(split[0].equalsIgnoreCase("/q1"))
+        	{
+        		if (moveth != null) {moveth.running = false; testnpc.delete(); testnpc.untrack(player); freeze(500);}
+        		testnpc = new NPC("",playerCenter(player.getX()),player.getY(),playerCenter(player.getZ()),(float)player.getRotation(),(float)player.getPitch(),1);
+        		moveth = new ThreadNPCPath(testnpc,tmpTo,player);
+        		return true;
+        	}
+        	
+        	if(split[0].equalsIgnoreCase("/q2"))
+        	{
+        		tmpTo = new Location(LtB(player.getX()),(int)player.getY(),LtB(player.getZ()));
+        		return true;
+        	}
+        	
+        	if(split[0].equalsIgnoreCase("/work"))
+        	{
+
+        		
+        		for (int i=-100;i<100;i++)
+        		{
+        			for (int j=-100;j<100;j++)
+        			{
+        				for (int l=-20;l<20;l++)
+        				{
+        					if (server.getBlockAt(LtB(player.getX())+i, LtB(player.getY())+l, LtB(player.getZ())+j).getType() == 17)
+        					{
+        						player.sendMessage("FountTree");
+        		        		testnpc = new NPC("",LtB(player.getX())+i+1, LtB(player.getY())+l, LtB(player.getZ())+j+1,(float)player.getRotation(),(float)player.getPitch(),1);
+        		        		testnpc.broadcastMovement();
+        		        		testnpc.broadcastPosition();
+        					}
+        				}
+        			}
+        		}
+        		
         		return true;
         	}
         	
@@ -570,13 +665,9 @@ public class MMMsurvival extends Plugin
         	}
         	
         	//Build House
-        	if(split[0].equalsIgnoreCase("/qest"))
+        	if(split[0].equalsIgnoreCase("/aaa"))
         	{
-        		int x = LtB(player.getX()) + 3;
-        		int y = LtB(player.getY()) + 3;
-        		int z = LtB(player.getZ()) + 3;
-        		buildHouse(player, x, y, z);
-        		return true;
+
         	}
         	
         	//LeakCheck
@@ -846,10 +937,42 @@ public class MMMsurvival extends Plugin
         
         public boolean onBlockCreate(Player player, Block blockPlaced, Block blockClicked, int itemInHand)
         {
+        	if (blockPlaced.getType() == 58)
+        		return true;
+        	
+        	//Unlock&&Lock Doors
+        	if (blockClicked.getType() == 64)
+        	{
+        		if (server.isTimerExpired("LockUnlockDoor-"+player.getName()))
+        		{
+        			House tmphouse = isPartOfAHouse(blockClicked,false);
+        			if (tmphouse != null)
+        			{
+        				tmphouse.openDoors();
+        				houses.remove(tmphouse);
+        				player.sendMessage("Unlocking...");
+        			}else{
+                		int x = blockClicked.getX();
+                		int y = blockClicked.getY();
+                		int z = blockClicked.getZ();
+                		
+                		buildhouse = new ThreadBuildHouse(player,x,y,z);
+        			}
+        			server.setTimer("LockUnlockDoor-"+player.getName(),0);
+        		}else{
+        			server.setTimer("LockUnlockDoor-"+player.getName(),5);
+        		}
+        		
+        	}
+        	
+        	if (!(isPartOfAHouse(blockClicked,true) == null))
+        		return true;
+        	
             if(stats(player).prohibitedblocks.contains(Integer.valueOf(blockPlaced.getType())))
                 return true;
+            
             Block underBlock = server.getBlockAt(blockPlaced.getX(), blockPlaced.getY() - 1, blockPlaced.getZ());
-            if(underBlock.getType() == 0 && stats(player).reputation < 2)
+            if(underBlock.getType() == 0 && stats(player).reputation < 2 && blockPlaced.getType() != -1)
             {
                 player.sendMessage("You don't have enough reputation!");
                 return true;
@@ -863,18 +986,26 @@ public class MMMsurvival extends Plugin
         }
 
         public boolean onBlockDestroy(Player player, Block block)
-        {
-        	if (block.getStatus() == 0 && block.getType() == 64 && server.getBlockAt(block.getX(), block.getY()+1, block.getZ()).getType() == 64)
-        	{
-        		int x = block.getX();
-        		int y = block.getY();
-        		int z = block.getZ();
-        		
-        		new ThreadBuildHouse(player, x, y, z);
+        {        	
+        	if (block.getType() == 54 && block.getStatus()==0) {
+        		Chest cblock = (Chest)server.getComplexBlock(block.getX(), block.getY(), block.getZ());
+        		String str = "I:";
+
+        		for (hj item:cblock.getArray())
+        		{
+        			if (item != null){
+        				str += " [Type:"+item.c+" Count:"+item.a+"] ";
+        			}
+        		}
+        		player.sendMessage(str);
         	}
+        	
+        	if (!(isPartOfAHouse(block,false) == null))
+        		return true;
         	
             if(block.getStatus() == 1 && stats(player).prohibitedblocks.contains(Integer.valueOf(block.getType())))
                 return true;
+            
             PlayerBlock playerblock = getPlayerblock(block);
             if(block.getStatus() == 3 && playerblock != null)
             {
@@ -890,6 +1021,7 @@ public class MMMsurvival extends Plugin
                 player.sendMessage((new StringBuilder()).append(druber).toString());
                 server.setBlockAt(0, block.getX(), block.getY() + 1, block.getZ());
             }
+
             return false;
         }
 
@@ -906,27 +1038,27 @@ public class MMMsurvival extends Plugin
 
     public class ThreadBuildHouse extends Thread
     {
+    	//Thread Stuff
         boolean running = false;
         Player player;
         
-        Stack<Block> doors = new Stack<Block>();
-        ArrayList<Block> tempdoors;
-        HashSet<String> processeddoors = new HashSet<String>();
+        House house;
         
+        //Global Stuff
         ArrayList<HashSet<String>> rooms = new ArrayList<HashSet<String>>();
-        
-        HashSet<String> processed;
-        HashMap<Integer,Integer> blockcount;
-        
-        int c;
-        
-        boolean door = false;
-        Block doorblock = null;
+        HashSet<String> doors = new HashSet<String>();
+        ArrayList<String> entries = new ArrayList<String>();
+
+        //Queue/Stack Stuff
+        Stack<String> doorStack = new Stack<String>();
         
         public ThreadBuildHouse(Player player, int x, int y, int z)
         {
         	this.player = player;
-        	doors.push(new Block(64,x,y,z));
+        	house = new House(player.getName());
+        	
+        	//Begin
+        	doorStack.push(XYZ(x,y,z));
             
             running = true;
             this.start();
@@ -934,134 +1066,219 @@ public class MMMsurvival extends Plugin
         
         public void run()
         {
-        	player.sendMessage("-House-");
-        	while (!doors.empty())
+        	//Do for every added Doorblock
+        	while (!doorStack.empty())
         	{
-        		Block door = doors.pop(); 
-            	int x = door.getX();
-            	int y = door.getY();
-            	int z = door.getZ();
-            	
-            	processeddoors.add(x+":"+(y+1)+":"+z);
-            	processeddoors.add(x+":"+(y)+":"+z);
-            	
-            	int tx = 0, ty = 0, tz = 0;
-            	//Get Other Things
-            	if (!transparentBlocks.contains(server.getBlockAt(x+1, y, z).getType()) && !transparentBlocks.contains(server.getBlockAt(x-1, y, z).getType()))
-            	{
-            		tx = x; ty = y; tz = z+1;
-            		if (!roomProcessed(tx,ty,tz)) {makeRoom(door,tx,ty,tz);}
-            		
-            		tx = x; ty = y; tz = z-1;
-            		if (!roomProcessed(tx,ty,tz)) {makeRoom(door,tx,ty,tz);}
-            	}
-            	else if (!transparentBlocks.contains(server.getBlockAt(x, y, z+1).getType()) && !transparentBlocks.contains(server.getBlockAt(x, y, z-1).getType()))
-            	{
-            		tx = x+1; ty = y; tz = z;
-            		if (!roomProcessed(tx,ty,tz)) {makeRoom(door,tx,ty,tz);}
-            		
-            		tx = x-1; ty = y; tz = z;
-            		if (!roomProcessed(tx,ty,tz)) {makeRoom(door,tx,ty,tz);}
-            	}
-            	
-        	}
-        	player.sendMessage("------");
-        }
-        
-        public void makeRoom(Block door, int x, int y, int z)
-        {        	
-        	int dx = door.getX();
-        	int dy = door.getY();
-        	int dz = door.getZ();
-        	
-        	processed = new HashSet<String>();
-        	blockcount = new HashMap<Integer,Integer>();
-        	tempdoors = new ArrayList<Block>();
-        	c = 0;
-        	
-        	//AddOtherDoorBlocks
-        	processed.add(dx+":"+(dy+1)+":"+dz);
-        	processed.add(dx+":"+dy+":"+dz);
-        	
-        	if (makeRoomStep(x, y, z))
-        	{
-        		ping( "Room size: "+c);
-        		rooms.add(processed);
-        		//player.sendMessage("Another room");
+        		String door = doorStack.pop(); 
         		
-        		for (Block tempdoor:tempdoors)
-        		{
-        			doors.push(tempdoor);
-        		}
+        		String split[] = door.split(":");
+        		int x = Integer.valueOf(split[0]);
+        		int y = Integer.valueOf(split[1]);
+        		int z = Integer.valueOf(split[2]);
+            	
+            	//Try to fixate the whole door, not only one block
+            	for (String Tdoor:getAdjacentDoorBlocks(x,y,z)) {doors.add(Tdoor);}
+            	
+            	//Get the direction of the door and only process these rooms
+            	int tx = 0, ty = 0, tz = 0, tt = 0;
+            	if (transparentBlocks.contains(server.getBlockAt(x, y, z+1).getType()) && transparentBlocks.contains(server.getBlockAt(x, y, z-1).getType()))
+            	{
+            		tx = x; ty = y; tz = z+1; tt = server.getBlockAt(tx,ty,tz).getType();
+            		if (!roomProcessed(tx,ty,tz,tt)) {makeRoom(door,tx,ty,tz);}
+            		
+            		tx = x; ty = y; tz = z-1; tt = server.getBlockAt(tx,ty,tz).getType();
+            		if (!roomProcessed(tx,ty,tz,tt)) {makeRoom(door,tx,ty,tz);}
+            	}
+            	else if (transparentBlocks.contains(server.getBlockAt(x+1, y, z).getType()) && transparentBlocks.contains(server.getBlockAt(x-1, y, z).getType()))
+            	{
+            		tx = x+1; ty = y; tz = z; tt = server.getBlockAt(tx,ty,tz).getType();
+            		if (!roomProcessed(tx,ty,tz,tt)) {makeRoom(door,tx,ty,tz);}
+            		
+            		tx = x-1; ty = y; tz = z; tt = server.getBlockAt(tx,ty,tz).getType();
+            		if (!roomProcessed(tx,ty,tz,tt)) {makeRoom(door,tx,ty,tz);}
+            	}
         	}
-        	else
+        	        	
+        	if (house.blockCount > 1)
         	{
-        		//ping("Leak!");
+        		player.sendMessage("Locking...");
+        		
+        		house.setDoors(doors);
+        		house.setEntries(entries);
+        		
+        		if (!house.isSomebodyInside())
+        		{
+        			//Close Doors
+        			house.closeDoors();
+        			
+	        		//Test a Random Block against other houses
+	        		int size = house.rooms.get(0).blocks.size();
+	        		int item = new Random().nextInt(size); // In real life, the Random object should be rather more shared than this
+	        		int i = 0;
+	        		
+	        		String str = "";
+	        		for(String obj : house.rooms.get(0).blocks)
+	        		{
+	        		    if (i == item)
+	        		        str = obj;
+	        		    i = i + 1;
+	        		}
+	        		
+	        		if (str!="")
+	        		{
+		        		String tbsplit[] = str.split(":");
+		        		int x = Integer.valueOf(tbsplit[0]);
+		        		int y = Integer.valueOf(tbsplit[1]);
+		        		int z = Integer.valueOf(tbsplit[2]);
+		        		int t = Integer.valueOf(tbsplit[3]);
+		        		
+		        		for (House ehouse:houses)
+		        		{
+		        			if (ehouse.isPartOf(x, y, z, t))
+		        			{
+			        			houses.remove(ehouse);
+		        			}
+		        		}
+		        		houses.add(house);
+		        		house.getReport(player);
+	        		}
+        		}else{
+        			player.sendMessage("Get out of there!");
+        		}
+        	}else{
+        		player.sendMessage("No room");
         	}
-        	
-            //if (chckLeakingStep(x+1, y, z)) {ping( "Room size: "+c); }else{ ping("Leak!"); }
         }
         
-        public boolean makeRoomStep(int x, int y, int z)
-        {
-            if (processed.contains(String.valueOf(x)+":"+y+":"+z)) {return true;}
-            processed.add(String.valueOf(x)+":"+y+":"+z);
-
-            if (server.getBlockAt(x, y-1, z).getY() == getHighestBlockY(x, z))
-            {
-            	//player.sendMessage("LEAK");
-            	return false;
-            }
-            
-            int type = server.getBlockAt(x, y, z).getType();
-            if (!transparentBlocks.contains(Integer.valueOf(type)))
-            {
-            	System.out.println(""+x+" "+y+" "+z);
-            	if (type == 64 && server.getBlockAt(x, y-1, z).getType() != 64 && server.getBlockAt(x, y-1, z).getType() != 0)
-            	{
-            		door = true;
-            		if (server.getBlockAt(x, y+1, z).getType() == 64)
-            		{
-            			if (!processeddoors.contains(x+":"+y+":"+z))
-            			{
-            				tempdoors.add(new Block(64,x,y,z));
-            			}
-            		}
-            	}
-            	
-            	if (blockcount.containsKey(type))
-            	{
-            		blockcount.put(type, blockcount.get(type)+1);
-            	}
-            	else
-            	{
-            		blockcount.put(type, 1);
-            	}
-            	//player.sendMessage("Wall");
-            	return true;
-            }
-            
-            if (	makeRoomStep(x, y - 1, z) &&
-            		makeRoomStep(x, y + 1, z) &&
-            		makeRoomStep(x + 1, y, z) &&
-            		makeRoomStep(x - 1, y, z) &&
-            		makeRoomStep(x, y, z + 1) &&
-            		makeRoomStep(x, y, z - 1))
-            	{
-                    c++;
-                    return true;
-                }else{
-                	return false;
-                }
-        }
-
-        public boolean roomProcessed(int x, int y, int z)
-        {
-        	for (HashSet<String> room : rooms)
+        public void makeRoom(String bdoor, int bx, int by, int bz)
+        {        	
+    		String bsplit[] = bdoor.split(":");
+    		int dx = Integer.valueOf(bsplit[0]);
+    		int dy = Integer.valueOf(bsplit[1]);
+    		int dz = Integer.valueOf(bsplit[2]);
+        	
+        	boolean leaked = false;
+        	
+        	//Temp
+        	String tmpEntry = "";
+        	ArrayList<String> tmpDoors = new ArrayList<String>();
+        	Stack<String> blockStack = new Stack<String>();
+        	
+        	//Globals
+        	int blockCount = 0;
+        	HashSet<String> blocks = new HashSet<String>();
+        	HashMap<Integer,Integer> itemList = new HashMap<Integer,Integer>();
+        	HashMap<Integer,Integer> blockList = new HashMap<Integer,Integer>();
+        	
+        	blockStack.push(XYZ(bx,by,bz));
+        	
+        	//Trying to fixate the whole door not only one doorblock
+        	for (String Tdoor:getAdjacentDoorBlocks(dx,dy,dz))
         	{
-        		if (room.contains(x+":"+y+":"+z)) {return true;}
+        		blocks.add(Tdoor+":64");
+        		String split[] = Tdoor.split(":");
         	}
         	
+        	Step:
+        	while (blockStack.size() > 0 && !leaked)
+        	{
+        		//Get Block-Coordinates
+        		String block = blockStack.pop();
+        		
+        		String split[] = block.split(":");
+        		int x = Integer.valueOf(split[0]);
+        		int y = Integer.valueOf(split[1]);
+        		int z = Integer.valueOf(split[2]);
+        		int t = server.getBlockAt(x, y, z).getType();
+        		
+        		//Quit if block was already processed
+        		if (blocks.contains(XYZT(x,y,z,t))) {continue Step;}
+                blocks.add(XYZT(x,y,z,t));
+                
+                //If the block under current block is the highest, it has to be leaked, break the while
+                if (server.getBlockAt(x, y-1, z).getY() == getHighestBlockY(x, z))
+                {
+                	leaked = true;
+                	break Step;
+                }
+                
+                //Get if that Block is solid
+                if (!transparentBlocks.contains(t))
+                {
+                	//Add to blockList
+                	int blockListCount = 0;
+                	if (blockList.containsKey(t))
+                	{
+                		blockListCount = blockList.get(t);
+                	}
+                	blockListCount++;
+                	blockList.put(t, blockListCount);
+                	
+                	//If its a door, add it in a temporary collection
+                	if (t == 64 && server.getBlockAt(x, y-1, z).getType() != 64 && server.getBlockAt(x, y-1, z).getType() != 0)
+                	{
+                		if (server.getBlockAt(x, y+1, z).getType() == 64)
+                		{
+                			if (!doors.contains(XYZ(x,y,z)))
+                			{
+                				tmpDoors.add(XYZ(x,y,z));
+                			}
+                		}
+                	}
+                	
+                	//If its a chest, add its contents to items
+                	if (t == 54)
+                	{
+                		Chest chest = (Chest)server.getComplexBlock(x,y,z);
+                		for (hj item:chest.getArray())
+                		{
+                			if (item != null){
+                            	int itemListCount = item.a;
+                            	if (itemList.containsKey(item.c))
+                            	{
+                            		itemListCount += itemList.get(item.c);
+                            	}
+                            	itemList.put(item.c, itemListCount);
+                			}
+                		}
+                	}
+                	
+                	continue Step;
+                }
+                
+                //Add all blocks around that block if its a transparent one
+                blockStack.push( XYZ((x+1),y,z) );
+                blockStack.push( XYZ((x-1),y,z) );
+                blockStack.push( XYZ(x,y,(z+1)) );
+                blockStack.push( XYZ(x,y,(z-1)) );
+                blockStack.push( XYZ(x,(y+1),z) );
+                blockStack.push( XYZ(x,(y-1),z) );
+                blockCount++;
+                
+        	}
+        	
+        	//If there is no leak
+        	if (!leaked)
+	        {
+	        	//ping( "Room size: "+blockCount);
+	        	rooms.add(blocks);
+	        	house.addRoom( new Room(blockCount,blocks,blockList,itemList) );
+	        		
+	        	//Add the temporary doors finally to the doorqueue
+	        	for (String tmpDoor:tmpDoors)
+	        	{
+	        		doorStack.push(tmpDoor);
+	        	}
+        	}else{
+        		entries.add(tmpEntry);
+        		//ping("Leaked!");
+        	}
+        	
+        }
+
+        public boolean roomProcessed(int x, int y, int z, int t)
+        {
+        	for (HashSet<String> room : rooms) {if (room.contains(XYZT(x,y,z,t))) {return true;}}
         	return false;
         }
         
@@ -1166,6 +1383,64 @@ public class MMMsurvival extends Plugin
         	
         	lastrot = npc.getRotation();
         	//server.getPlayer("Mendel").sendMessage(""+BtL(x)+y+BtL(z));
+        }
+    }
+    
+    public class ThreadNPCPath extends Thread
+    {
+    	boolean running = false;
+    	boolean goal = false;
+    	
+    	Player player;
+        NPC npc;
+        Location to;
+        Stack<String> walked = new Stack<String>();
+        
+        public ThreadNPCPath(NPC npc, Location to, Player player)
+        {
+        	this.npc = npc;
+        	this.to = to;
+        	this.player = player;
+        	
+            running = true;
+            this.start();
+        }
+        
+        public void run()
+        {
+        	step(LtB(npc.getX()),(int)npc.getY(),LtB(npc.getX()));
+        	player.sendMessage("Tracking completed");
+        	for (String str:walked)
+        	{
+        		String split[] = str.split(":");
+        		move(Integer.valueOf(split[0]),Integer.valueOf(split[1]),Integer.valueOf(split[2]));
+        	}
+        }
+        
+        public void step(int x,int y,int z)
+        {
+        	if (walked.contains(x+":"+y+":"+z)) {return;}
+        	walked.add(x+":"+y+":"+z);
+        	
+        	if (server.getBlockAt(x, y, z).getType()!=0) {return;}
+        	if (x==to.x && z==to.z) {goal = true;}
+        	
+        	Block tblock = new Block(20,x,y,z);
+        	addPlayerblock(player,tblock);
+        	server.setBlock(tblock);
+        	
+        	if (!goal) {step(x+1,y,z);}
+        	if (!goal) {step(x-1,y,z);}
+        	if (!goal) {step(x,y,z+1);}
+        	if (!goal) {step(x,y,z-1);}
+        }
+        
+        public void move(double x, double y, double z)
+        {
+        	npc.teleportTo(x, npc.getY(), z, npc.getRotation(), npc.getPitch());
+        	npc.broadcastPosition();
+        	npc.broadcastMovement();
+        	freeze(1000);
         }
     }
     
@@ -1283,6 +1558,12 @@ public class MMMsurvival extends Plugin
                 
                 //server.setBlockAt(20, LtB(player.getX()), (int)player.getY(), LtB(player.getZ()));
 
+                //Check
+                if (buildhouse != null && buildhouse.isAlive())
+                {
+                	player.sendMessage("Not null");
+                }
+                
                 if(elapsed(5000L))
                 {
                     for(Iterator<Objective> iterator = objectives.iterator(); iterator.hasNext();)
@@ -1308,11 +1589,13 @@ public class MMMsurvival extends Plugin
 
                 }
                 
+                //Always Day
                 if (elapsed(10000))
                 {
                 	server.setTime(2000);
                 }
                 
+                //Nights Survived Increase
                 if (elapsed(1000))
                 {
                 	long servertime = (server.getTime()%24000);
@@ -1336,6 +1619,7 @@ public class MMMsurvival extends Plugin
                 	}
                 }
                 
+                //Drowning
                 if (elapsed(1000))
                 {
                     if (stats(player).reputation < 4 && stats(player).underwater)
@@ -1362,6 +1646,7 @@ public class MMMsurvival extends Plugin
                     }
                 }
                 
+                //Mob-Attack
                 try
                 {
                     List<Mob> servermobs = Collections.synchronizedList(server.getMobList());
@@ -1377,22 +1662,19 @@ public class MMMsurvival extends Plugin
                             loc.z = ((Mob)servermobs.get(i)).getZ();
                             if(hasSight(loc, player.getLocation()))
                             {
-                                if(stats(player).hostilemobs.contains(String.valueOf(mob.getId())))
-                                {
-                                    if(elapsed(2000L))
-                                        playerDamage(player, 1);
-                                } else
-                                {
                                     if(((Mob)servermobs.get(i)).getName() == "Zombie" && elapsed(500L))
                                         playerDamage(player, 1);
-                                    if(((Mob)servermobs.get(i)).getName() == "Skeleton" && elapsed(1000L))
+                                    else if(((Mob)servermobs.get(i)).getName() == "Skeleton" && elapsed(1000L))
                                         playerDamage(player, 3);
-                                    if(((Mob)servermobs.get(i)).getName() == "Spider" && elapsed(2000L))
+                                    else if(((Mob)servermobs.get(i)).getName() == "Spider" && elapsed(2000L))
                                         playerDamage(player, 7);
-                                    if(((Mob)servermobs.get(i)).getName() == "Creeper" && elapsed(200L))
+                                    else if(((Mob)servermobs.get(i)).getName() == "Creeper" && elapsed(200L))
                                         playerDamage(player, 2);
-                                }
-                                continue;
+                                    else if(stats(player).hostilemobs.contains(String.valueOf(mob.getId())))
+                                    	if(elapsed(2000L))
+                                            playerDamage(player, 1);
+                                    
+                                    continue;
                             }
                         }
                         if(elapsed(1000) && mob.getHealth() > 10 && Math.abs(mob.getX() - player.getX()) <= durRange && Math.abs(mob.getY() - player.getY()) <= durRange && Math.abs(mob.getZ() - player.getZ()) <= durRange)
@@ -1569,7 +1851,9 @@ public class MMMsurvival extends Plugin
             {
                 System.out.println((new StringBuilder("Exception while reading ")).append(location).toString());
             }
+            
         UpdateWarps();
+        
         location = "MMMsurvival\\items.txt";
         if((new File(location)).exists())
             try
@@ -1604,6 +1888,7 @@ public class MMMsurvival extends Plugin
             {
                 System.out.println(e.getLocalizedMessage()+"NOGGER");
             }
+            
         location = "MMMsurvival\\mobs.txt";
         if((new File(location)).exists())
             try
@@ -1626,6 +1911,7 @@ public class MMMsurvival extends Plugin
             {
                 System.out.println((new StringBuilder("Exception while reading ")).append(location).toString());
             }
+            
         location = "MMMsurvival\\objectives.txt";
         if((new File(location)).exists())
             try
@@ -1648,6 +1934,7 @@ public class MMMsurvival extends Plugin
             {
                 System.out.println((new StringBuilder("Exception while reading ")).append(location).toString());
             }
+            
         location = "MMMsurvival\\reputations.txt";
         if((new File(location)).exists())
             try
@@ -1670,7 +1957,9 @@ public class MMMsurvival extends Plugin
             {
                 System.out.println((new StringBuilder("Exception while reading ")).append(e.getMessage()).toString());
             }
+            
         loadPlayerblocks();
+        loadHouses();
         /*uploadFile("/var/www/html/minecraft/armory", "MMMsurvival\\items.txt", "items.txt");
         uploadFile("/var/www/html/minecraft/armory", "MMMsurvival\\objectives.txt", "objectives.txt");
         uploadFile("/var/www/html/minecraft/armory", "MMMsurvival\\mobs.txt", "mobs.txt");*/
@@ -1695,6 +1984,7 @@ public class MMMsurvival extends Plugin
 
         savePlayerblocks();
         saveWarps();
+        saveHouses();
     }
 
     public PlayerBlock getPlayerblock(Block block)
@@ -1957,7 +2247,7 @@ public class MMMsurvival extends Plugin
         loc.y = 100D;
         loc.x = randSign(500 + rand(1000));
         loc.z = randSign(500 + rand(1000));
-        server.setTimer((new StringBuilder("Spawnprotection-")).append(player.getName()).toString(), 42);
+        server.setTimer((new StringBuilder("Spawnprotection-")).append(player.getName()).toString(), 60);
         player.teleportTo(loc);
     }
 
@@ -2068,6 +2358,47 @@ public class MMMsurvival extends Plugin
         }
     }
 
+    public void loadHouses()
+    {
+    	File player = new File("MMMsurvival\\Houses\\");
+    	if (player.exists()){
+	    	File[] directories = player.listFiles();
+	    	for (int jndex = 0; jndex < directories.length; jndex++)
+	    	{
+	    		
+	        File house = new File(directories[jndex].toString());
+	        File[] files = house.listFiles();
+	    	for (int index = 0; index < files.length; index++)
+	    	{
+	    		
+	        try
+	        {
+	            String xml = "";
+	            try
+	            {
+	                BufferedReader in = new BufferedReader(new FileReader(files[index].toString()));
+	                String str;
+	                while((str = in.readLine()) != null) 
+	                    xml = (new StringBuilder(String.valueOf(xml))).append(str).toString();
+	                in.close();
+	            }
+	            catch(IOException ioexception) { }
+	            
+	            Unmarshaller unmarshaller = JAXBContext.newInstance(House.class).createUnmarshaller();
+	            
+				House obj = (House)unmarshaller.unmarshal(new StringReader(xml));
+	            houses.add(obj);
+	        }
+	        catch(Exception e)
+	        {
+	        	this.houses = new HashSet<House>();
+	        	System.out.println("New house!");
+	        }
+	    	}
+	    	}
+    	}
+    }
+    
     public void loadPlayerblocks()
     {
         try
@@ -2082,7 +2413,7 @@ public class MMMsurvival extends Plugin
         }
         catch(Exception e)
         {
-            server.useConsoleCommand("say THERES NOTHING THER");
+            System.out.println();
             playerBlocks = new HashMap<String, HashSet<PlayerBlock>>();
         }
     }
@@ -2101,7 +2432,64 @@ public class MMMsurvival extends Plugin
         }
     }
 
-    public void UpdateWarps()
+    public void saveHouses()
+    {
+    	//Delete house folder
+//    	String directory = ("MMMsurvival\\Houses");
+//    	File dir = new File(directory);
+//    	if (deleteDir(dir)){log("Deleting houses...");}else{log("Error while deleting houses!");}
+//    	
+//    	dir.mkdir();
+    	
+    	//Save houses with its hashname in playerfolder
+    	for (House house:houses)
+    	{
+    		
+    	String name = (house.owner+"\\"+String.valueOf(house.hashCode()));
+    	String directory = ("MMMsurvival\\Houses\\"+house.owner);
+    	File dir = new File(directory);
+    	if (!dir.exists())
+    	{
+    		dir.mkdir();
+    	}
+
+        try
+        {
+            JAXBContext context = JAXBContext.newInstance(House.class);
+            Marshaller m = context.createMarshaller();
+            
+            m.setProperty("jaxb.formatted.output", Boolean.valueOf(true));
+            FileOutputStream fs = new FileOutputStream("MMMsurvival\\Houses\\"+name+".xml");
+            m.marshal(house, fs);
+            //uploadFile("/var/www/html/minecraft/armory/player", (new StringBuilder("MMMsurvival\\Saves\\")).append(player.getName()).append(".xml").toString(), (new StringBuilder(String.valueOf(player.getName()))).append(".xml").toString());
+        }
+        catch(Exception e)
+        {
+            System.out.println((new StringBuilder("Error saving : ")).append(e.getMessage()).toString());
+        }
+        
+    	}
+        /*try
+        {
+            JAXBContext context = JAXBContext.newInstance(HashSet.class);
+            Marshaller m = context.createMarshaller();
+            
+            m.setProperty("jaxb.formatted.output", Boolean.valueOf(true));
+            FileOutputStream fs = new FileOutputStream("MMMsurvival\\houses.xml");
+            m.marshal(houses, fs);
+        }
+        catch(Exception e)
+        {
+            System.out.println((new StringBuilder("Error saving : ")).append(e.getMessage()).toString());
+        }*/
+    }
+    
+    public void log(String string)
+    {
+		System.out.println(string);
+	}
+
+	public void UpdateWarps()
     {
         for(int i = 0; i < warps.size(); i++)
         {
@@ -2152,7 +2540,7 @@ public class MMMsurvival extends Plugin
         }
     }
 
-    public int getPVPWeaponDamage(int w)
+    public int getWeaponPVPDamage(int w)
     {
     	if(w == 268)
         	return 10;
@@ -2372,32 +2760,6 @@ public class MMMsurvival extends Plugin
         return null;
     }
 
-    public ArrayList<Mob> getTargetsInFront(Location loc, double range)
-    {
-        ArrayList<Mob> targets = new ArrayList<Mob>();
-        List<Mob> servermobs = Collections.synchronizedList(server.getMobList());
-        double rot_x = (loc.rotX + 90F) % 360F;
-        double rot_y = loc.rotY * -1F;
-        double y_offset = 1.0D * Math.sin(Math.toRadians(rot_y));
-        double x_offset = 1.0D * Math.cos(Math.toRadians(rot_x));
-        double z_offset = 1.0D * Math.sin(Math.toRadians(rot_x));
-        for(int i = 3; i > 0; i--)
-        {
-            double target_x = (double)i * x_offset + loc.x;
-            double target_y = (double)i * y_offset + loc.y + 1.0D;
-            double target_z = (double)i * z_offset + loc.z;
-            for(Iterator<Mob> iterator = servermobs.iterator(); iterator.hasNext();)
-            {
-                Mob mob = (Mob)iterator.next();
-                if(isBetweenDouble(mob.getX(), target_x, range) && isBetweenDouble(mob.getY(), target_y, 3D) && isBetweenDouble(mob.getZ(), target_z, range) && !targets.contains(mob))
-                    targets.add(mob);
-            }
-
-        }
-
-        return targets;
-    }
-
     public boolean isBetweenDouble(double x1, double x2, double range)
     {
         return x2 >= x1 - range && x2 <= x1 + range;
@@ -2484,6 +2846,18 @@ public class MMMsurvival extends Plugin
 		return 0;
     }
 
+    public int getNextFloorBlock(int x, int y, int z)
+    {
+		for (int i = y; i > 0; i--)
+		{
+			if (!transparentBlocks.contains(server.getBlockAt(x, i, z).getType()))
+			{
+    			return i+1;
+			}
+		}
+		return 0;
+    }
+    
 	public double mathFixed(double x, double d)
 	{
 		int da = (int)(x/d);
@@ -2500,4 +2874,68 @@ public class MMMsurvival extends Plugin
 		int a = (int) (d*p);
 		return ( (double)a/p );
 	}
+
+	public ArrayList<String> getAdjacentDoorBlocks(int x, int y, int z)
+	{
+		ArrayList<String> doors = new ArrayList<String>();
+		y--; x--; z--;
+		
+		for (int fx=0;fx<=2;fx++)
+		{
+			for (int fz=0;fz<=2;fz++)
+			{
+				for (int fy=0;fy<=2;fy++)
+				{
+					if (server.getBlockAt((x+fx), (y+fy), (z+fz)).getType() == 64) {doors.add((x+fx)+":"+(y+fy)+":"+(z+fz));}
+				}
+			}
+		}
+		
+		return doors;
+	}
+
+	public House isPartOfAHouse(Block block, boolean ignoreType)
+	{
+		int x = block.getX();
+		int y = block.getY();
+		int z = block.getZ();
+		int t = block.getType();
+		
+		for (House house:houses)
+		{
+			if (ignoreType)
+			{
+				if (house.isPartOf(x, y, z)) {return house;}
+			}else{
+				if (house.isPartOf(x, y, z, t)) {return house;}
+			}
+		}
+		return null;
+	}
+
+	public String XYZ(int x,int y,int z)
+	{
+		return (x+":"+y+":"+z);
+	}
+
+	public String XYZT(int x,int y,int z,int t)
+	{
+		return (x+":"+y+":"+z+":"+t);
+	}
+
+    public static boolean deleteDir(File dir) {
+        if (dir.isDirectory()) {
+            String[] children = dir.list();
+            for (int i=0; i<children.length; i++) {
+                boolean success = deleteDir(new File(dir, children[i]));
+                if (!success) {
+                    return false;
+                }
+            }
+        }
+    
+        // The directory is now empty so delete it
+        return dir.delete();
+    } 
+	
 }

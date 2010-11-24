@@ -21,7 +21,7 @@ public class PlayerStats
     long survived;
     int reputation;
     String reputationName;
-    int fallingDamage;
+    double fallingDamage;
     int profFishing;
     int profFishingFished;
     
