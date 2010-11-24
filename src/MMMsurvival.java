@@ -582,7 +582,27 @@ public class MMMsurvival extends Plugin
         	//New Wave
         	if(split[0].equalsIgnoreCase("/west"))
         	{
-        		new ThreadWave(player);
+        		//hd mob = (hd)monstor.getMob(); mob.f = somePlayer;
+        		//nto (gd) and use public boolean a(dx paramdx, int paramInt)
+        		Location loc = player.getLocation();
+        		loc.x += 10;
+        		loc.z += 10;
+        		
+        		Mob mob1 = new Mob("Zombie", loc);
+        		mob1.spawn();
+        		
+        		gb mob = (gb)mob1.getMob();
+        		mob.j = null;
+        		mob.k = null;
+        		
+        		if (mob.a(player.getUser(), 2))
+        		{
+        			player.sendMessage("treu");
+        		}else{
+        			player.sendMessage("False");
+        		}
+        		
+        		player.sendMessage(""+mob1.getHealth()+" ");
         		return true;
         	}
         	
@@ -991,12 +1011,12 @@ public class MMMsurvival extends Plugin
         		Chest cblock = (Chest)server.getComplexBlock(block.getX(), block.getY(), block.getZ());
         		String str = "I:";
 
-        		for (hj item:cblock.getArray())
-        		{
-        			if (item != null){
-        				str += " [Type:"+item.c+" Count:"+item.a+"] ";
-        			}
-        		}
+//        		for (hj item:cblock.getArray())
+//        		{
+//        			if (item != null){
+//        				str += " [Type:"+item.c+" Count:"+item.a+"] ";
+//        			}
+//        		}
         		player.sendMessage(str);
         	}
         	
@@ -1227,21 +1247,21 @@ public class MMMsurvival extends Plugin
                 	}
                 	
                 	//If its a chest, add its contents to items
-                	if (t == 54)
-                	{
-                		Chest chest = (Chest)server.getComplexBlock(x,y,z);
-                		for (hj item:chest.getArray())
-                		{
-                			if (item != null){
-                            	int itemListCount = item.a;
-                            	if (itemList.containsKey(item.c))
-                            	{
-                            		itemListCount += itemList.get(item.c);
-                            	}
-                            	itemList.put(item.c, itemListCount);
-                			}
-                		}
-                	}
+//                	if (t == 54)
+//                	{
+//                		Chest chest = (Chest)server.getComplexBlock(x,y,z);
+//                		for (hj item:chest.getArray())
+//                		{
+//                			if (item != null){
+//                            	int itemListCount = item.a;
+//                            	if (itemList.containsKey(item.c))
+//                            	{
+//                            		itemListCount += itemList.get(item.c);
+//                            	}
+//                            	itemList.put(item.c, itemListCount);
+//                			}
+//                		}
+//                	}
                 	
                 	continue Step;
                 }
