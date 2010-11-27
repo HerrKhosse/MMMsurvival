@@ -9,10 +9,10 @@ public class House
 {
 	String owner;
 	int blockCount;
-	
 	ArrayList<String> entries = new ArrayList<String>();
 	ArrayList<Room> rooms = new ArrayList<Room>();
     HashSet<String> doors = new HashSet<String>();
+    HouseJob job;
     
     public House() {}
 	public House(String owner)
@@ -45,8 +45,10 @@ public class House
 			player.sendMessage("->"+room.blocks.size());
 		}
 		
-		player.sendMessage("Doors: "+doors.size());
-		player.sendMessage("Entries: "+entries.size());
+		//player.sendMessage("Doors: "+doors.size());
+		//player.sendMessage("Entries: "+entries.size());
+		
+		if (job != null){player.sendMessage(job.toString());}else{player.sendMessage("NoJob");}
 	}
 	
 	public int hashCode()
@@ -69,6 +71,17 @@ public class House
 		}
 		
 		return false;
+	}
+	
+	public int getBlockTypeAmount(int t)
+	{
+		int amount = 0;
+		for (Room room:rooms)
+		{
+			if (room.blockList.containsKey(t))
+			{amount += room.blockList.get(t);}
+		}
+		return amount;
 	}
 	
 	public boolean isPartOf(int x, int y, int z)
@@ -122,7 +135,7 @@ public class House
 		
 	}
 	
-	public void closeDoor(Block block)
+	static public void closeDoor(Block block)
 	{
 		int data = block.getData();
 		int direction;
@@ -162,7 +175,12 @@ public class House
 		etc.getServer().setBlockData(block.getX(), block.getY(), block.getZ(), data);
 	}
 	
-    public int LtB(double d)
+	static public boolean fullFillsRequirements(House house)
+	{
+		return false;
+	}
+	
+	static public int LtB(double d)
     {
         return (int)Math.round(d - 0.5D);
     }

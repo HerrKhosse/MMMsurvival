@@ -14,7 +14,7 @@ import org.apache.commons.net.ftp.FTPClient;
 public class MMMsurvival extends Plugin
 {
 	
-    private MMMsurvivalListener listener 						= new MMMsurvivalListener();;
+    private MMMsurvivalListener listener 						= new MMMsurvivalListener();
     private Random randomGenerator 								= new Random();
     
     private List<Warp> warps 									= new ArrayList<Warp>();
@@ -79,6 +79,20 @@ public class MMMsurvival extends Plugin
 
         public void onArmSwing(Player player)
         {
+        	
+            blox = new HitBlox(player, 50, 0.1);
+            if(blox.getTargetBlock() != null)
+            {
+            	Block tmpblock = blox.getCurBlock();
+            	//player.sendMessage(""+tmpblock.getType()+" "+tmpblock.getData());
+            	if (tmpblock.getType() == 58)
+            	{
+            		player.kick("Don't use Workbenches!");
+            		server.setBlockAt(0, tmpblock.getX(), tmpblock.getY(), tmpblock.getZ());
+                }
+
+            }
+
             switch(player.getItemInHand())
             {
             
@@ -622,9 +636,12 @@ public class MMMsurvival extends Plugin
         	
         	if(split[0].equalsIgnoreCase("/ww"))
         	{
-        		if (moveth != null) {moveth.running = false; testnpc.delete(); testnpc.untrack(player); freeze(500);}
-        		testnpc = new NPC("",playerCenter(player.getX()),player.getY(),playerCenter(player.getZ()),(float)player.getRotation(),(float)player.getPitch(),1);
+        		//if (moveth != null) {moveth.running = false; testnpc.delete(); testnpc.untrack(player); freeze(500);}
+        		//testnpc = new NPC("",playerCenter(player.getX()),player.getY(),playerCenter(player.getZ()),(float)player.getRotation(),(float)player.getPitch(),1);
         		//moveth = new ThreadNPCMovement(testnpc);
+        		server.setBlockAt(12, 0, 80, 0);
+        		server.setBlockAt(12, 0, 81, 0);
+        		player.teleportTo(0.5,80,0.5,player.getRotation(),player.getPitch());
         		return true;
         	}
         	
@@ -957,8 +974,12 @@ public class MMMsurvival extends Plugin
         
         public boolean onBlockCreate(Player player, Block blockPlaced, Block blockClicked, int itemInHand)
         {
-        	if (blockPlaced.getType() == 58)
+        	if (blockPlaced.getType() == 58){
+        		//player.sendMessage("Dont try this again...");
+        		//playerDropInventory(player);
+        		player.kick("Don't build workbenches!");
         		return true;
+        	}
         	
         	//Unlock&&Lock Doors
         	if (blockClicked.getType() == 64)
@@ -970,6 +991,8 @@ public class MMMsurvival extends Plugin
         			{
         				tmphouse.openDoors();
         				houses.remove(tmphouse);
+        				tmphouse.job.quit();
+        				
         				player.sendMessage("Unlocking...");
         			}else{
                 		int x = blockClicked.getX();
@@ -1159,6 +1182,15 @@ public class MMMsurvival extends Plugin
 			        			houses.remove(ehouse);
 		        			}
 		        		}
+		        		
+		        		if (Doorery.fits(house))
+		        		{
+		        			house.job = new Doorery(house);
+		        			etc.getServer().getPlayer("HerrKhosse").sendMessage("It works");
+		        		}else{
+		        			
+		        		}
+		        		
 		        		houses.add(house);
 		        		house.getReport(player);
 	        		}
@@ -1581,7 +1613,7 @@ public class MMMsurvival extends Plugin
                 //Check
                 if (buildhouse != null && buildhouse.isAlive())
                 {
-                	player.sendMessage("Not null");
+                	//player.sendMessage("Not null");
                 }
                 
                 if(elapsed(5000L))
